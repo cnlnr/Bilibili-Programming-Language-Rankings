@@ -1,0 +1,65 @@
+name: Auto Crawl & Deploy to GitHub Pages
+
+on:
+  schedule:
+    # 每月 1 号 UTC 00:00 (北京时间 08:00) 自动执行数据抓取与发布
+    - cron: '0 0 1 * *'
+  # 当手动向 main 分支 push 代码（比如修改了 index.html）时也自动发布
+  push:
+    branches: ["main"]
+  # 支持在 GitHub 网页上点击按钮手动运行
+  workflow_dispatch:
+
+permissions:
+  contents: write    # 允许推送更新后的 data.json 回 main 分支
+  pages: write       # 允许部署到 GitHub Pages
+  id-token: write    # 验证 Pages 部署所需的 OpenID 凭据
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 执行数据抓取
+        run: |
+          python update_data.py
+
+      - name: 提交并推送最新数据回仓库
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add data.json
+          if git diff --staged --quiet; then
+            echo "数据未发生变化，跳过 Git 提交。"
+          else
+            git commit -m "chore(data): auto update ranking data.json [skip ci]"
+            git push origin main
+          fi
+
+      - name: 配置 GitHub Pages 环境
+        uses: actions/configure-pages@v5
+
+      - name: 上传网页与数据制品
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 打包根目录下的 index.html 与刚抓取出的 data.json
+          path: '.'
+
+      - name: 部署发布到 Pages 网站
+        id: deployment
+        uses: actions/deploy-pages@v4
