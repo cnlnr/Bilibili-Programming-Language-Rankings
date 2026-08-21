@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilibili 编程语言教程热度榜</title>
+    <style>
+        :root {
+            --bg: #0b0f19;
+            --card-bg: #151d30;
+            --card-sub: #1e2942;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #2d3a54;
+            --accent: #38bdf8;
+            --bar-color: rgba(56, 189, 248, 0.16);
+            --bar-line: rgba(56, 189, 248, 0.5);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 32px 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; gap: 14px; }
+        h1 { font-size: 24px; margin: 0; }
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .update-time { font-size: 13px; color: var(--text-dim); }
+        .github-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--card-sub);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .github-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(56, 189, 248, 0.08);
+        }
+        .github-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+        .desc { color: var(--text-dim); font-size: 14px; margin-bottom: 24px; }
+
+        .section-box {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 20px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+        .table-wrap { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            min-width: 860px;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-size: 14px;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        th {
+            background: var(--card-sub);
+            color: var(--text-dim);
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            transition: 0.2s;
+        }
+        th:hover { color: var(--accent); }
+        th.sort-active { color: var(--accent); }
+        th.sort-desc::after { content: " ▼"; font-size: 10px; }
+        th.sort-asc::after { content: " ▲"; font-size: 10px; }
+
+        /* 核心：整行渐变进度条与高亮 */
+        tr.data-row {
+            transition: background 0.35s ease-out;
+        }
+        tr.data-row:hover td {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* 列宽分配 */
+        .col-rank { width: 50px; text-align: center; color: var(--text-dim); font-weight: bold; }
+        .col-tag { width: 100px; color: var(--accent); font-weight: 600; }
+        .col-num { width: 95px; font-family: monospace; font-size: 13px; }
+        .col-num.active-metric {
+            color: #fff;
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+        }
+        .col-title {
+            width: auto;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .title-link {
+            color: var(--text);
+            text-decoration: none;
+        }
+        .title-link:hover {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+        .loading { text-align: center; padding: 40px; color: var(--text-dim); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Bilibili 编程语言教程排行榜</h1>
+            <div class="header-actions">
+                <div class="update-time" id="updateTime">最后更新: 加载中...</div>
+                <a class="github-btn" href="https://github.com/cnlnr/Bilibili-Programming-Language-Rankings" target="_blank" rel="noopener noreferrer">
+                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+        <div class="desc">💡 点击任意数值表头，整行将按比例自动展开背景发光对比条</div>
+
+        <div class="section-box">
+            <div class="table-wrap">
+                <table id="rankTable">
+                    <thead>
+                        <tr>
+                            <th class="col-rank">排名</th>
+                            <th class="col-tag">标签</th>
+                            <th class="col-num sort-active sort-desc" data-key="favorite">收藏数</th>
+                            <th class="col-num" data-key="view">播放量</th>
+                            <th class="col-num" data-key="like">点赞数</th>
+                            <th class="col-num" data-key="coin">硬币数</th>
+                            <th class="col-num" data-key="reply">评论数</th>
+                            <th class="col-num" data-key="danmaku">弹幕数</th>
+                            <th class="col-title">视频标题</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="9" class="loading">正在加载数据...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawData = [];
+        let currentKey = "favorite";
+        let isAsc = false;
+
+        function fmt(n) {
+            if (n >= 1e8) return (n / 1e8).toFixed(1) + '亿';
+            if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
+            return (n || 0).toLocaleString();
+        }
+
+        function render() {
+            if (!rawData.length) return;
+            rawData.sort((a, b) => isAsc ? (a[currentKey] - b[currentKey]) : (b[currentKey] - a[currentKey]));
+
+            const maxVal = Math.max(...rawData.map(r => r[currentKey]), 1);
+
+            document.getElementById("tableBody").innerHTML = rawData.map((r, idx) => {
+                const pct = ((r[currentKey] / maxVal) * 100).toFixed(1);
+                // 使用 CSS 线性渐变直接给 tr 绘制进度条（带边缘微光线）
+                const rowBg = `linear-gradient(to right, var(--bar-color) 0%, var(--bar-color) ${pct}%, var(--bar-line) ${pct}%, transparent calc(${pct}% + 1.5px), transparent 100%)`;
+
+                return `
+                    <tr class="data-row" style="background: ${rowBg};">
+                        <td class="col-rank">${idx + 1}</td>
+                        <td class="col-tag">${r.tag}</td>
+                        <td class="col-num ${currentKey === 'favorite' ? 'active-metric' : ''}">${fmt(r.favorite)}</td>
+                        <td class="col-num ${currentKey === 'view' ? 'active-metric' : ''}">${fmt(r.view)}</td>
+                        <td class="col-num ${currentKey === 'like' ? 'active-metric' : ''}">${fmt(r.like)}</td>
+                        <td class="col-num ${currentKey === 'coin' ? 'active-metric' : ''}">${fmt(r.coin)}</td>
+                        <td class="col-num ${currentKey === 'reply' ? 'active-metric' : ''}">${fmt(r.reply)}</td>
+                        <td class="col-num ${currentKey === 'danmaku' ? 'active-metric' : ''}">${fmt(r.danmaku)}</td>
+                        <td class="col-title">
+                            <a class="title-link" href="${r.url}" target="_blank" title="${r.title}">${r.title}</a>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        // 绑定表头点击
+        document.querySelectorAll("th[data-key]").forEach(th => {
+            th.addEventListener("click", () => {
+                const key = th.getAttribute("data-key");
+                if (currentKey === key) {
+                    isAsc = !isAsc;
+                } else {
+                    currentKey = key;
+                    isAsc = false;
+                }
+                document.querySelectorAll("th").forEach(h => h.classList.remove("sort-active", "sort-desc", "sort-asc"));
+                th.classList.add("sort-active", isAsc ? "sort-asc" : "sort-desc");
+                render();
+            });
+        });
+
+        // 异步读取紧凑 data.json
+        fetch('./data.json')
+            .then(res => res.json())
+            .then(res => {
+                document.getElementById('updateTime').innerText = `最后更新: ${res.updated_at || '未知'}`;
+                rawData = (res.rows || []).map(([tag, bvid, title, favorite, view, like, coin, reply, danmaku]) => ({
+                    tag, bvid, title, favorite, view, like, coin, reply, danmaku,
+                    url: `https://www.bilibili.com/video/${bvid}`
+                }));
+                render();
+            })
+            .catch(err => {
+                document.getElementById("tableBody").innerHTML = `<tr><td colspan="9" class="loading" style="color:#ef4444">加载 data.json 失败: ${err}</td></tr>`;
+            });
+    </script>
+</body>
+</html>
