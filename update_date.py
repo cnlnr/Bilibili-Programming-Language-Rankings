@@ -3,8 +3,10 @@
 
 from datetime import datetime
 import json
+import re
 import time
-import bilibili_analyzer as ba
+import urllib.error
+import urllib.request
 
 urls = {
     "CMD": "https://www.bilibili.com/video/BV1RG41137kJ/",
@@ -37,17 +39,51 @@ urls = {
 }
 
 
+def parse_bvid(url_str: str) -> str:
+    """从链接中正则提取 BV 号"""
+    match = re.search(r"(BV[a-zA-Z0-9]{10})", str(url_str))
+    return match.group(1) if match else ""
+
+
+def fmt_number(n: int) -> str:
+    """数值格式化（万/亿）"""
+    if not isinstance(n, (int, float)):
+        return "0"
+    if n >= 100_000_000:
+        return f"{n / 100_000_000:.1f}亿"
+    if n >= 10_000:
+        return f"{n / 10_000:.1f}万"
+    return f"{n:,}"
+
+
+def fetch_bilibili_data(bvid: str) -> dict:
+    """调用 B 站公开 Web API 获取视频详情"""
+    api_url = f"https://api.bilibili.com/x/web-interface/view?bvid={bvid}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.bilibili.com/",
+    }
+    req = urllib.request.Request(api_url, headers=headers)
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        res = json.loads(resp.read().decode("utf-8"))
+        if res.get("code") == 0:
+            return res.get("data", {})
+        raise ValueError(f"B站接口返回异常: code={res.get('code')}, msg={res.get('message')}")
+
+
 def main():
     rows = []
     total = len(urls)
     print(f"开始批量获取数据（共 {total} 个目标）...\n")
 
     for idx, (tag, raw_url) in enumerate(urls.items(), start=1):
-        bvid = ba.parse_bvid(raw_url)
+        bvid = parse_bvid(raw_url)
         if not bvid:
+            print(f"[{idx}/{total}] ❌ 解析 BV 号失败: {tag} -> {raw_url}")
             continue
+
         try:
-            data = ba.fetch(bvid)
+            data = fetch_bilibili_data(bvid)
             stat = data.get("stat", {})
             title = data.get("title", "未知标题")
             fav = stat.get("favorite", 0)
@@ -57,12 +93,13 @@ def main():
             reply = stat.get("reply", 0)
             danmaku = stat.get("danmaku", 0)
 
-            # 二维紧凑存储结构: [tag, bvid, title, fav, view, like, coin, reply, danmaku]
+            # 二维紧凑存储: [tag, bvid, title, fav, view, like, coin, reply, danmaku]
             rows.append([tag, bvid, title, fav, view, like, coin, reply, danmaku])
-            print(f"[{idx}/{total}] {tag:<8} | 收藏: {ba.fmt(fav):>6} | 播放: {ba.fmt(view):>6}")
+            print(f"[{idx}/{total}] {tag:<8} | 收藏: {fmt_number(fav):>6} | 播放: {fmt_number(view):>6}")
         except Exception as e:
-            print(f"[{idx}/{total}] ❌ 抓取失败: {tag} - {e}")
-        time.sleep(0.2)
+            print(f"[{idx}/{total}] ❌ 抓取失败: {tag} ({bvid}) - {e}")
+
+        time.sleep(0.3)  # 适当延时防频控
 
     payload = {
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
