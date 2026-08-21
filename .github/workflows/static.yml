@@ -4,10 +4,7 @@ on:
   schedule:
     # 每月 1 号 UTC 00:00 (北京时间 08:00) 自动执行数据抓取与发布
     - cron: '0 0 1 * *'
-  # 当手动向 main 分支 push 代码（比如修改了 index.html）时也自动发布
-  push:
-    branches: ["main"]
-  # 支持在 GitHub 网页上点击按钮手动运行
+  # 支持在 GitHub 网页 Actions 页面点击按钮手动触发
   workflow_dispatch:
 
 permissions:
