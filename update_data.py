@@ -32,10 +32,7 @@ urls = {
     "Bash": "https://www.bilibili.com/video/BV1ah411R7W6/",
     "汇编": "https://www.bilibili.com/video/BV1Wu411B72F/",
     "Nim": "https://www.bilibili.com/video/BV1zp4y137zi/",
-    "易语言": "https://www.bilibili.com/video/BV14W411R75Y/",
     "R": "https://www.bilibili.com/video/BV1fh411H7vi/",
-    "iApp": "https://www.bilibili.com/video/BV18T4y177YQ/",
-    "结绳": "https://www.bilibili.com/video/BV13K411Q7nV/",
     "Perl": "https://www.bilibili.com/video/BV1px411e7gc/",
 }
 
