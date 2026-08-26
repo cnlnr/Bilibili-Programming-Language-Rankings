@@ -3,8 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- 彻底禁用 HTML 页面缓存 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <title>Bilibili 编程语言教程热度档案馆</title>
-    <!-- 引入轻量级 Chart.js 图表库 -->
+    <!-- 引入 Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -163,12 +169,12 @@
     </div>
 
     <script>
-        let historySnapshots = []; // 全部历史快照列表
-        let currentTableData = [];  // 最新一期用于表格展示的数据
+        let historySnapshots = [];
+        let currentTableData = [];
         let currentSortKey = "favorite";
         let isAsc = false;
         let chartInstance = null;
-        let selectedSpanDays = 0; // 0 表示全部
+        let selectedSpanDays = 0;
 
         const METRIC_INDEX_MAP = {
             favorite: 3, view: 4, like: 5, coin: 6, reply: 7, danmaku: 8
@@ -185,7 +191,6 @@
             return (n || 0).toLocaleString();
         }
 
-        // 渲染表格
         function renderTable() {
             if (!currentTableData.length) return;
             currentTableData.sort((a, b) => isAsc ? (a[currentSortKey] - b[currentSortKey]) : (b[currentSortKey] - a[currentSortKey]));
@@ -214,14 +219,12 @@
             }).join("");
         }
 
-        // 初始化与更新折线图
         function updateTrendChart() {
             if (!historySnapshots.length) return;
 
             const selectedMetric = document.getElementById("chartMetricSelect").value;
             const metricIdx = METRIC_INDEX_MAP[selectedMetric];
 
-            // 1. 过滤时间范围
             const now = new Date(historySnapshots[historySnapshots.length - 1].updated_at.replace(/-/g, "/")).getTime();
             const filteredSnapshots = historySnapshots.filter(snap => {
                 if (selectedSpanDays === 0) return true;
@@ -230,8 +233,6 @@
             });
 
             const labels = filteredSnapshots.map(s => s.updated_at.split(" ")[0]);
-
-            // 2. 获取排名前 8 语言（保持图表清晰）
             const topTags = currentTableData.slice(0, 8).map(d => d.tag);
 
             const datasets = topTags.map((tag, i) => {
@@ -280,7 +281,7 @@
             });
         }
 
-        // 事件监听绑定
+        // 表头点击排序事件
         document.querySelectorAll("th[data-key]").forEach(th => {
             th.addEventListener("click", () => {
                 const key = th.getAttribute("data-key");
@@ -292,6 +293,7 @@
             });
         });
 
+        // 跨度按钮切换
         document.getElementById("timeFilters").addEventListener("click", (e) => {
             if (e.target.tagName === "BUTTON") {
                 document.querySelectorAll("#timeFilters button").forEach(b => b.classList.remove("active"));
@@ -301,13 +303,13 @@
             }
         });
 
+        // 图表指标切换
         document.getElementById("chartMetricSelect").addEventListener("change", updateTrendChart);
 
-        // 加载并初始化数据
-        fetch('./data.json')
+        // 携带毫秒时间戳与 no-store 彻底击穿浏览器与 GitHub Pages 静态缓存
+        fetch(`./data.json?_t=${Date.now()}`, { cache: 'no-store' })
             .then(res => res.json())
             .then(data => {
-                // 兼容老单快照与新历史数组结构
                 historySnapshots = Array.isArray(data) ? data : [data];
                 const latestSnapshot = historySnapshots[historySnapshots.length - 1];
 
