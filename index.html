@@ -47,7 +47,6 @@
         .github-btn:hover { border-color: var(--accent); color: var(--accent); }
         .github-btn svg { width: 15px; height: 15px; fill: currentColor; }
 
-        /* 通用卡片容器 */
         .section-box {
             background: var(--card-bg);
             border-radius: 12px;
@@ -56,7 +55,6 @@
             box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
         }
 
-        /* 控制栏面板 */
         .controls-bar {
             display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px;
         }
@@ -75,10 +73,8 @@
             padding: 5px 10px; border-radius: 6px; font-size: 12px; outline: none;
         }
 
-        /* 图表容器：高度 520px */
         .chart-wrapper { position: relative; width: 100%; height: 520px; }
 
-        /* 表格样式 */
         .table-wrap { overflow-x: auto; }
         table { width: 100%; min-width: 860px; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
         th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -135,8 +131,8 @@
                 <!-- 模式切换与指标下拉 -->
                 <div class="controls-right">
                     <div class="btn-group" id="viewModeGroup">
-                        <button class="mode-btn active" data-mode="total">📈 总量趋势</button>
-                        <button class="mode-btn" data-mode="delta">⚡ 净增量变化</button>
+                        <button class="mode-btn active" data-mode="total">🔥 热度总量趋势</button>
+                        <button class="mode-btn" data-mode="delta">⚡ 飞速发展榜 (净增)</button>
                     </div>
                     <select class="metric-select" id="chartMetricSelect">
                         <option value="view">播放量</option>
@@ -184,7 +180,7 @@
         let isAsc = false;
         let chartInstance = null;
         let selectedSpanDays = 0;
-        let viewMode = "total"; // "total" (总量趋势) 或 "delta" (净增量变化)
+        let viewMode = "total";
 
         const METRIC_INDEX_MAP = {
             favorite: 3, view: 4, like: 5, coin: 6, reply: 7, danmaku: 8
@@ -243,44 +239,41 @@
             });
 
             const labels = filteredSnapshots.map(s => s.updated_at.split(" ")[0]);
-
-            // 计算所有语言在时间范围内的总增量，方便在 delta 模式下找出真正的“增长黑马”
-            const langGrowthList = currentTableData.map(d => {
-                const tag = d.tag;
-                let firstVal = null, lastVal = null;
-                for (const snap of filteredSnapshots) {
-                    const row = (snap.rows || []).find(r => r[0] === tag);
-                    if (row) {
-                        if (firstVal === null) firstVal = row[metricIdx];
-                        lastVal = row[metricIdx];
-                    }
-                }
-                const growth = (lastVal !== null && firstVal !== null) ? (lastVal - firstVal) : 0;
-                return { tag, growth };
-            });
-
-            // 模式分支选择排名前 6 的语言：
-            // - total 模式：展示当前总量最高的前 6 门语言
-            // - delta 模式：展示该时间段内净增量最高的前 6 门黑马语言
             let targetTags = [];
+
             if (viewMode === "delta") {
-                langGrowthList.sort((a, b) => b.growth - a.growth);
-                targetTags = langGrowthList.slice(0, 6).map(item => item.tag);
+                const growthMap = currentTableData.map(d => {
+                    const tag = d.tag;
+                    let startVal = null, endVal = null;
+                    for (const snap of filteredSnapshots) {
+                        const row = (snap.rows || []).find(r => r[0] === tag);
+                        if (row) {
+                            if (startVal === null) startVal = row[metricIdx];
+                            endVal = row[metricIdx];
+                        }
+                    }
+                    const delta = (endVal !== null && startVal !== null) ? (endVal - startVal) : 0;
+                    return { tag, delta };
+                });
+
+                growthMap.sort((a, b) => b.delta - a.delta);
+                targetTags = growthMap.slice(0, 6).map(item => item.tag);
             } else {
-                targetTags = currentTableData.slice(0, 6).map(d => d.tag);
+                const sortedByTotal = [...currentTableData].sort((a, b) => b[selectedMetric] - a[selectedMetric]);
+                targetTags = sortedByTotal.slice(0, 6).map(d => d.tag);
             }
 
             const datasets = targetTags.map((tag, i) => {
                 const color = COLOR_PALETTE[i % COLOR_PALETTE.length];
                 
-                let baseVal = null; // 用于 delta 模式的基础归零基准
+                let baseVal = null;
                 const dataPoints = filteredSnapshots.map(snap => {
                     const row = (snap.rows || []).find(r => r[0] === tag);
                     if (!row) return null;
                     const val = row[metricIdx];
                     if (viewMode === "delta") {
                         if (baseVal === null) baseVal = val;
-                        return val - baseVal; // 净增量折线（以起始点为 0）
+                        return val - baseVal;
                     }
                     return val;
                 });
@@ -291,7 +284,7 @@
                     borderColor: color,
                     backgroundColor: color,
                     borderWidth: 2.5,
-                    tension: 0.2,
+                    tension: 0, // 0 = 彻底关闭平滑贝塞尔曲线，纯刚性直线连点
                     pointRadius: 5,
                     pointHoverRadius: 7
                 };
@@ -318,11 +311,11 @@
                                 label: (ctx) => {
                                     const val = ctx.raw || 0;
                                     const dIndex = ctx.dataIndex;
-                                    let diffText = "";
                                     if (viewMode === "delta") {
-                                        diffText = val >= 0 ? ` (+${val.toLocaleString()})` : ` (${val.toLocaleString()})`;
-                                        return ` ${ctx.dataset.label} 累计净增: ${diffText}`;
+                                        const prefix = val >= 0 ? `+${val.toLocaleString()}` : `${val.toLocaleString()}`;
+                                        return ` ${ctx.dataset.label} 净增: ${prefix}`;
                                     } else {
+                                        let diffText = "";
                                         if (dIndex > 0) {
                                             const prevVal = ctx.dataset.data[dIndex - 1] || 0;
                                             const diff = val - prevVal;
@@ -340,7 +333,7 @@
                             ticks: { color: '#94a3b8', font: { size: 11 } } 
                         },
                         y: { 
-                            beginAtZero: viewMode === "delta", // 净增量模式必须从 0 开始
+                            beginAtZero: viewMode === "delta",
                             grace: '5%',
                             grid: { color: 'rgba(45, 58, 84, 0.4)' }, 
                             ticks: { 
@@ -375,7 +368,7 @@
             }
         });
 
-        // 模式切换（总量 vs 净增量）
+        // 模式切换
         document.getElementById("viewModeGroup").addEventListener("click", (e) => {
             if (e.target.tagName === "BUTTON") {
                 document.querySelectorAll("#viewModeGroup button").forEach(b => b.classList.remove("active"));
@@ -388,7 +381,7 @@
         // 指标下拉切换
         document.getElementById("chartMetricSelect").addEventListener("change", updateTrendChart);
 
-        // 携带时间戳强制穿透缓存拉取数据
+        // 强制无缓存拉取
         fetch(`./data.json?_t=${Date.now()}`, { cache: 'no-store' })
             .then(res => res.json())
             .then(data => {
