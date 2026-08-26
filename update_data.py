@@ -3,6 +3,7 @@
 
 from datetime import datetime
 import json
+import os
 import re
 import time
 import urllib.error
@@ -95,21 +96,38 @@ def main():
 
             # 二维紧凑存储: [tag, bvid, title, fav, view, like, coin, reply, danmaku]
             rows.append([tag, bvid, title, fav, view, like, coin, reply, danmaku])
-            print(f"[{idx}/{total}] {tag:<8} | 收藏: {fmt_number(fav):>6} | 播放: {fmt_number(view):>6}")
+            print(f"[{idx}/{total}] {tag:<10} | 收藏: {fmt_number(fav):>6} | 播放: {fmt_number(view):>6}")
         except Exception as e:
             print(f"[{idx}/{total}] ❌ 抓取失败: {tag} ({bvid}) - {e}")
 
-        time.sleep(0.3)  # 适当延时防频控
+        time.sleep(0.3)
 
-    payload = {
+    new_snapshot = {
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "rows": rows,
     }
 
-    with open("data.json", "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    # 1. 兼容读取已有历史数据（自动平滑迁移旧单快照格式）
+    history = []
+    if os.path.exists("data.json"):
+        try:
+            with open("data.json", "r", encoding="utf-8") as f:
+                old_data = json.load(f)
+                if isinstance(old_data, list):
+                    history = old_data
+                elif isinstance(old_data, dict) and "rows" in old_data:
+                    history = [old_data]
+        except Exception as e:
+            print(f"读取旧数据异常（将重置为新列表）: {e}")
 
-    print("\n抓取完成！紧凑数据已写入 ./data.json")
+    # 2. 直接无脑追加最新一期快照
+    history.append(new_snapshot)
+
+    # 3. 写回 data.json
+    with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
+    print(f"\n抓取完成！已追加写入 ./data.json（当前历史快照总数: {len(history)} 期）")
 
 
 if __name__ == "__main__":
