@@ -205,12 +205,12 @@
                     <tr class="data-row" style="background: ${rowBg};">
                         <td class="col-rank">${idx + 1}</td>
                         <td class="col-tag">${r.tag}</td>
-                        <td class="col-num ${currentSortKey === 'favorite' ? 'active-metric' : ''}" title="${r.favorite.toLocaleString()}">${fmt(r.favorite)}</td>
-                        <td class="col-num ${currentSortKey === 'view' ? 'active-metric' : ''}" title="${r.view.toLocaleString()}">${fmt(r.view)}</td>
-                        <td class="col-num ${currentSortKey === 'like' ? 'active-metric' : ''}" title="${r.like.toLocaleString()}">${fmt(r.like)}</td>
-                        <td class="col-num ${currentSortKey === 'coin' ? 'active-metric' : ''}" title="${r.coin.toLocaleString()}">${fmt(r.coin)}</td>
-                        <td class="col-num ${currentSortKey === 'reply' ? 'active-metric' : ''}" title="${r.reply.toLocaleString()}">${fmt(r.reply)}</td>
-                        <td class="col-num ${currentSortKey === 'danmaku' ? 'active-metric' : ''}" title="${r.danmaku.toLocaleString()}">${fmt(r.danmaku)}</td>
+                        <td class="col-num ${currentSortKey === 'favorite' ? 'active-metric' : ''}" title="精准数值: ${r.favorite.toLocaleString()}">${fmt(r.favorite)}</td>
+                        <td class="col-num ${currentSortKey === 'view' ? 'active-metric' : ''}" title="精准数值: ${r.view.toLocaleString()}">${fmt(r.view)}</td>
+                        <td class="col-num ${currentSortKey === 'like' ? 'active-metric' : ''}" title="精准数值: ${r.like.toLocaleString()}">${fmt(r.like)}</td>
+                        <td class="col-num ${currentSortKey === 'coin' ? 'active-metric' : ''}" title="精准数值: ${r.coin.toLocaleString()}">${fmt(r.coin)}</td>
+                        <td class="col-num ${currentSortKey === 'reply' ? 'active-metric' : ''}" title="精准数值: ${r.reply.toLocaleString()}">${fmt(r.reply)}</td>
+                        <td class="col-num ${currentSortKey === 'danmaku' ? 'active-metric' : ''}" title="精准数值: ${r.danmaku.toLocaleString()}">${fmt(r.danmaku)}</td>
                         <td class="col-title">
                             <a class="title-link" href="https://www.bilibili.com/video/${r.bvid}" target="_blank" title="${r.title}">${r.title}</a>
                         </td>
@@ -225,15 +225,15 @@
             const selectedMetric = document.getElementById("chartMetricSelect").value;
             const metricIdx = METRIC_INDEX_MAP[selectedMetric];
 
-            const now = new Date(historySnapshots[historySnapshots.length - 1].updated_at.replace(/-/g, "/")).getTime();
+            const lastSnapTime = new Date(historySnapshots[historySnapshots.length - 1].updated_at.replace(/-/g, "/")).getTime();
             const filteredSnapshots = historySnapshots.filter(snap => {
                 if (selectedSpanDays === 0) return true;
                 const snapTime = new Date(snap.updated_at.replace(/-/g, "/")).getTime();
-                return (now - snapTime) <= (selectedSpanDays * 24 * 3600 * 1000);
+                return (lastSnapTime - snapTime) <= (selectedSpanDays * 24 * 3600 * 1000);
             });
 
             const labels = filteredSnapshots.map(s => s.updated_at.split(" ")[0]);
-            const topTags = currentTableData.slice(0, 8).map(d => d.tag);
+            const topTags = currentTableData.slice(0, 6).map(d => d.tag);
 
             const datasets = topTags.map((tag, i) => {
                 const color = COLOR_PALETTE[i % COLOR_PALETTE.length];
@@ -248,8 +248,9 @@
                     borderColor: color,
                     backgroundColor: color,
                     borderWidth: 2,
-                    tension: 0.3,
-                    pointRadius: filteredSnapshots.length > 30 ? 0 : 3
+                    tension: 0.2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 };
             });
 
@@ -266,16 +267,38 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: { labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12 } },
+                        legend: { 
+                            labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12 } 
+                        },
                         tooltip: {
                             callbacks: {
-                                label: (ctx) => ` ${ctx.dataset.label}: ${fmt(ctx.raw)} (${ctx.raw.toLocaleString()})`
+                                label: (ctx) => {
+                                    const val = ctx.raw || 0;
+                                    const dIndex = ctx.dataIndex;
+                                    let diffText = "";
+                                    if (dIndex > 0) {
+                                        const prevVal = ctx.dataset.data[dIndex - 1] || 0;
+                                        const diff = val - prevVal;
+                                        diffText = diff >= 0 ? ` (▲ +${diff.toLocaleString()})` : ` (▼ ${diff.toLocaleString()})`;
+                                    }
+                                    return ` ${ctx.dataset.label}: ${fmt(val)}${diffText}`;
+                                }
                             }
                         }
                     },
                     scales: {
-                        x: { grid: { color: 'rgba(45, 58, 84, 0.4)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                        y: { grid: { color: 'rgba(45, 58, 84, 0.4)' }, ticks: { color: '#94a3b8', callback: (v) => fmt(v) } }
+                        x: { 
+                            grid: { color: 'rgba(45, 58, 84, 0.4)' }, 
+                            ticks: { color: '#94a3b8', font: { size: 10 } } 
+                        },
+                        y: { 
+                            beginAtZero: false,
+                            grid: { color: 'rgba(45, 58, 84, 0.4)' }, 
+                            ticks: { 
+                                color: '#94a3b8', 
+                                callback: (v) => fmt(v) 
+                            } 
+                        }
                     }
                 }
             });
@@ -303,10 +326,10 @@
             }
         });
 
-        // 图表指标切换
+        // 指标下拉切换
         document.getElementById("chartMetricSelect").addEventListener("change", updateTrendChart);
 
-        // 携带毫秒时间戳与 no-store 彻底击穿浏览器与 GitHub Pages 静态缓存
+        // 携带毫秒时间戳与 no-store 穿透所有缓存层
         fetch(`./data.json?_t=${Date.now()}`, { cache: 'no-store' })
             .then(res => res.json())
             .then(data => {
