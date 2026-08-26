@@ -73,7 +73,7 @@
             padding: 5px 10px; border-radius: 6px; font-size: 12px; outline: none;
         }
 
-        .chart-wrapper { position: relative; width: 100%; height: 520px; }
+        .chart-wrapper { position: relative; width: 100%; height: 560px; }
 
         .table-wrap { overflow-x: auto; }
         table { width: 100%; min-width: 860px; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
@@ -99,7 +99,7 @@
     <div class="container">
         <!-- 头部导航 -->
         <div class="header">
-            <h1>📈 Bilibili 编程语言教程热度档案馆</h1>
+            <h1>⚡ Bilibili 编程语言飞速发展榜</h1>
             <div class="header-actions">
                 <div class="update-time" id="updateTime">最后更新: 加载中...</div>
                 <a class="github-btn" href="https://github.com/cnlnr/Bilibili-Programming-Language-Rankings" target="_blank" rel="noopener noreferrer">
@@ -131,8 +131,8 @@
                 <!-- 模式切换与指标下拉 -->
                 <div class="controls-right">
                     <div class="btn-group" id="viewModeGroup">
-                        <button class="mode-btn active" data-mode="total">🔥 热度总量趋势</button>
-                        <button class="mode-btn" data-mode="delta">⚡ 飞速发展榜 (净增)</button>
+                        <button class="mode-btn active" data-mode="delta">⚡ 飞速发展榜 (净增)</button>
+                        <button class="mode-btn" data-mode="total">🔥 热度总量趋势</button>
                     </div>
                     <select class="metric-select" id="chartMetricSelect">
                         <option value="view">播放量</option>
@@ -180,15 +180,18 @@
         let isAsc = false;
         let chartInstance = null;
         let selectedSpanDays = 0;
-        let viewMode = "total";
+        let viewMode = "delta";
 
         const METRIC_INDEX_MAP = {
             favorite: 3, view: 4, like: 5, coin: 6, reply: 7, danmaku: 8
         };
 
+        // 扩展为 20 种高区分度配色，支持 20 门语言同时展示
         const COLOR_PALETTE = [
             '#38bdf8', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6',
-            '#ec4899', '#06b6d4', '#84cc16', '#a855f7', '#64748b'
+            '#ec4899', '#06b6d4', '#84cc16', '#a855f7', '#64748b',
+            '#fb923c', '#4ade80', '#22d3ee', '#818cf8', '#e879f9',
+            '#facc15', '#2dd4bf', '#f87171', '#34d399', '#60a5fa'
         ];
 
         function fmt(n) {
@@ -238,10 +241,15 @@
                 return (lastSnapTime - snapTime) <= (selectedSpanDays * 24 * 3600 * 1000);
             });
 
-            const labels = filteredSnapshots.map(s => s.updated_at.split(" ")[0]);
+            const labels = filteredSnapshots.map(s => {
+                const parts = s.updated_at.split(" ");
+                return filteredSnapshots.length <= 15 ? `${parts[0].slice(5)} ${parts[1]}` : parts[0];
+            });
+
             let targetTags = [];
 
             if (viewMode === "delta") {
+                // ⚡ 飞速发展模式：按区间真实【净增量数值】倒序，追踪前 20 门语言
                 const growthMap = currentTableData.map(d => {
                     const tag = d.tag;
                     let startVal = null, endVal = null;
@@ -257,10 +265,11 @@
                 });
 
                 growthMap.sort((a, b) => b.delta - a.delta);
-                targetTags = growthMap.slice(0, 6).map(item => item.tag);
+                targetTags = growthMap.slice(0, 20).map(item => item.tag);
             } else {
+                // 🔥 热度总量模式：按总累计大盘排名前 20
                 const sortedByTotal = [...currentTableData].sort((a, b) => b[selectedMetric] - a[selectedMetric]);
-                targetTags = sortedByTotal.slice(0, 6).map(d => d.tag);
+                targetTags = sortedByTotal.slice(0, 20).map(d => d.tag);
             }
 
             const datasets = targetTags.map((tag, i) => {
@@ -283,10 +292,10 @@
                     data: dataPoints,
                     borderColor: color,
                     backgroundColor: color,
-                    borderWidth: 2.5,
-                    tension: 0, // 0 = 彻底关闭平滑贝塞尔曲线，纯刚性直线连点
-                    pointRadius: 5,
-                    pointHoverRadius: 7
+                    borderWidth: 2,
+                    tension: 0, // 刚性直线连点
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 };
             });
 
@@ -304,7 +313,13 @@
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: { 
-                            labels: { color: '#94a3b8', font: { size: 12 }, boxWidth: 14 } 
+                            position: 'top',
+                            labels: { 
+                                color: '#94a3b8', 
+                                font: { size: 11 }, 
+                                boxWidth: 10,
+                                padding: 8
+                            } 
                         },
                         tooltip: {
                             callbacks: {
@@ -334,7 +349,7 @@
                         },
                         y: { 
                             beginAtZero: viewMode === "delta",
-                            grace: '5%',
+                            grace: '8%',
                             grid: { color: 'rgba(45, 58, 84, 0.4)' }, 
                             ticks: { 
                                 color: '#94a3b8', 
@@ -346,7 +361,7 @@
             });
         }
 
-        // 表头点击排序事件
+        // 表头排序点击
         document.querySelectorAll("th[data-key]").forEach(th => {
             th.addEventListener("click", () => {
                 const key = th.getAttribute("data-key");
@@ -358,7 +373,7 @@
             });
         });
 
-        // 跨度按钮切换
+        // 跨度切换
         document.getElementById("timeFilters").addEventListener("click", (e) => {
             if (e.target.tagName === "BUTTON") {
                 document.querySelectorAll("#timeFilters button").forEach(b => b.classList.remove("active"));
@@ -378,7 +393,7 @@
             }
         });
 
-        // 指标下拉切换
+        // 指标切换
         document.getElementById("chartMetricSelect").addEventListener("change", updateTrendChart);
 
         // 强制无缓存拉取
