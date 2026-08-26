@@ -22,7 +22,7 @@ urls = {
     "Golang": "https://www.bilibili.com/video/BV1ME411Y71o/",
     "Vuejs": "https://www.bilibili.com/video/BV1Zy4y1K7SH/",
     "Python": "https://www.bilibili.com/video/BV1wD4y1o7AS/",
-    "Unity(C#)": "https://www.bilibili.com/video/BV1gQ4y1e7SS/",
+    "C#": "https://www.bilibili.com/video/BV1s1z6BHEfV/",
     "Java": "https://www.bilibili.com/video/BV17F411T7Ao/",
     "C++": "https://www.bilibili.com/video/BV1et411b73Z/",
     "Rust": "https://www.bilibili.com/video/BV1hp4y1k7SV/",
@@ -34,6 +34,12 @@ urls = {
     "Nim": "https://www.bilibili.com/video/BV1zp4y137zi/",
     "R": "https://www.bilibili.com/video/BV1fh411H7vi/",
     "Perl": "https://www.bilibili.com/video/BV1px411e7gc/",
+    "Dart": "https://www.bilibili.com/video/BV1S4411E7LY/",
+    "Zig": "https://www.bilibili.com/video/BV17im3B5EEw/",
+    "Verilog": "https://www.bilibili.com/video/BV12y4y1v7V3/",
+    "Scala": "https://www.bilibili.com/video/BV1Xh411S7bP/",
+    "Scratch": "https://www.bilibili.com/video/BV17F411b7UQ/",
+    "Matlab": "https://www.bilibili.com/video/BV13D4y1Q7RS",
 }
 
 
