@@ -73,8 +73,8 @@
             padding: 4px 10px; border-radius: 5px; font-size: 12px; outline: none;
         }
 
-        /* 图表容器 */
-        .chart-wrapper { position: relative; width: 100%; height: 320px; }
+        /* 图表容器：高度从 320px 扩展到 520px，彻底拉开纵向视觉跨度 */
+        .chart-wrapper { position: relative; width: 100%; height: 520px; }
 
         /* 表格样式 */
         .table-wrap { overflow-x: auto; }
@@ -247,10 +247,10 @@
                     data: dataPoints,
                     borderColor: color,
                     backgroundColor: color,
-                    borderWidth: 2,
+                    borderWidth: 2.5,
                     tension: 0.2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
+                    pointRadius: 5,
+                    pointHoverRadius: 7
                 };
             });
 
@@ -268,7 +268,7 @@
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: { 
-                            labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12 } 
+                            labels: { color: '#94a3b8', font: { size: 12 }, boxWidth: 14 } 
                         },
                         tooltip: {
                             callbacks: {
@@ -289,10 +289,11 @@
                     scales: {
                         x: { 
                             grid: { color: 'rgba(45, 58, 84, 0.4)' }, 
-                            ticks: { color: '#94a3b8', font: { size: 10 } } 
+                            ticks: { color: '#94a3b8', font: { size: 11 } } 
                         },
                         y: { 
                             beginAtZero: false,
+                            grace: '5%', // 在上下限预留 5% 缓冲，进一步放大曲线波动坡度
                             grid: { color: 'rgba(45, 58, 84, 0.4)' }, 
                             ticks: { 
                                 color: '#94a3b8', 
@@ -329,7 +330,7 @@
         // 指标下拉切换
         document.getElementById("chartMetricSelect").addEventListener("change", updateTrendChart);
 
-        // 携带毫秒时间戳与 no-store 穿透所有缓存层
+        // 携带时间戳强制穿透缓存
         fetch(`./data.json?_t=${Date.now()}`, { cache: 'no-store' })
             .then(res => res.json())
             .then(data => {
