@@ -8,8 +8,8 @@
     <meta http-equiv="Expires" content="0">
 
     <title>Bilibili 编程语言教程热度档案馆</title>
-    <!-- 引入 Apache ECharts -->
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- 引入 Apache ECharts 6.1.0 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
     <style>
         :root {
             --bg: #0b0f19;
@@ -227,48 +227,27 @@
             const selectedMetric = document.getElementById("chartMetricSelect").value;
             const metricIdx = METRIC_INDEX_MAP[selectedMetric];
 
-            const firstSnapTime = new Date(historySnapshots[0].updated_at.replace(/-/g, "/")).getTime();
             const lastSnapTime = new Date(historySnapshots[historySnapshots.length - 1].updated_at.replace(/-/g, "/")).getTime();
 
-            // 核心修复：当选定跨度时，X 轴的起点被严格固定在 (最早时间) 到 (最早时间 + 跨度天数)
             let xMin = null, xMax = null;
             if (selectedSpanDays > 0) {
-                xMin = firstSnapTime;
-                xMax = firstSnapTime + (selectedSpanDays * 24 * 3600 * 1000);
+                xMax = lastSnapTime;
+                xMin = lastSnapTime - (selectedSpanDays * 24 * 3600 * 1000);
             }
 
-            // 过滤超出跨度范围的快照
             const filteredSnapshots = historySnapshots.filter(snap => {
                 if (selectedSpanDays === 0) return true;
                 const snapTime = new Date(snap.updated_at.replace(/-/g, "/")).getTime();
-                return snapTime <= xMax;
+                return snapTime >= xMin && snapTime <= xMax;
             });
 
-            let targetTags = [];
+            // 严格锁定：按【收藏量最高的前 20 门大盘语言】作为展示对象
+            const top20ByFavorite = [...currentTableData]
+                .sort((a, b) => b.favorite - a.favorite)
+                .slice(0, 20)
+                .map(d => d.tag);
 
-            if (viewMode === "delta") {
-                const growthMap = currentTableData.map(d => {
-                    const tag = d.tag;
-                    let startVal = null, endVal = null;
-                    for (const snap of filteredSnapshots) {
-                        const row = (snap.rows || []).find(r => r[0] === tag);
-                        if (row) {
-                            if (startVal === null) startVal = row[metricIdx];
-                            endVal = row[metricIdx];
-                        }
-                    }
-                    const delta = (endVal !== null && startVal !== null) ? (endVal - startVal) : 0;
-                    return { tag, delta };
-                });
-
-                growthMap.sort((a, b) => b.delta - a.delta);
-                targetTags = growthMap.slice(0, 20).map(item => item.tag);
-            } else {
-                const sortedByTotal = [...currentTableData].sort((a, b) => b[selectedMetric] - a[selectedMetric]);
-                targetTags = sortedByTotal.slice(0, 20).map(d => d.tag);
-            }
-
-            const series = targetTags.map((tag, i) => {
+            const series = top20ByFavorite.map((tag, i) => {
                 let baseVal = null;
                 const points = [];
 
@@ -290,10 +269,10 @@
                     name: tag,
                     type: 'line',
                     data: points,
-                    smooth: false, // 纯刚性硬直折线
+                    smooth: false,
                     symbol: 'circle',
                     symbolSize: 6,
-                    lineStyle: { width: 2.5 }
+                    lineStyle: { width: 2.2 }
                 };
             });
 
@@ -332,7 +311,7 @@
                     containLabel: true
                 },
                 xAxis: {
-                    type: 'time', // 真实时间连续坐标轴
+                    type: 'time',
                     min: xMin,
                     max: xMax,
                     axisLine: { lineStyle: { color: '#2d3a54' } },
