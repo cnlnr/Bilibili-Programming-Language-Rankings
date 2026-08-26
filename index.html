@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bilibili 编程语言教程热度榜</title>
+    <title>Bilibili 编程语言教程热度档案馆</title>
+    <!-- 引入轻量级 Chart.js 图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg: #0b0f19;
@@ -22,126 +24,120 @@
             background: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 32px 20px;
+            padding: 24px 16px;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; gap: 14px; }
-        h1 { font-size: 24px; margin: 0; }
+        .container { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        h1 { font-size: 22px; margin: 0; }
         .header-actions { display: flex; align-items: center; gap: 12px; }
         .update-time { font-size: 13px; color: var(--text-dim); }
         .github-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: var(--card-sub);
-            color: var(--text);
-            border: 1px solid var(--border);
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s ease;
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--card-sub); color: var(--text);
+            border: 1px solid var(--border); padding: 5px 12px;
+            border-radius: 6px; font-size: 13px; text-decoration: none;
+            transition: all 0.2s;
         }
-        .github-btn:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-            background: rgba(56, 189, 248, 0.08);
-        }
-        .github-btn svg {
-            width: 16px;
-            height: 16px;
-            fill: currentColor;
-        }
-        .desc { color: var(--text-dim); font-size: 14px; margin-bottom: 24px; }
+        .github-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .github-btn svg { width: 15px; height: 15px; fill: currentColor; }
 
+        /* 通用卡片容器 */
         .section-box {
             background: var(--card-bg);
             border-radius: 12px;
             border: 1px solid var(--border);
-            padding: 20px;
+            padding: 18px;
             box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
         }
-        .table-wrap { overflow-x: auto; }
 
-        table {
-            width: 100%;
-            min-width: 860px;
-            table-layout: fixed;
-            border-collapse: collapse;
-            font-size: 14px;
-            text-align: left;
+        /* 控制栏面板 */
+        .controls-bar {
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px;
         }
-        th, td {
-            padding: 12px 14px;
-            border-bottom: 1px solid var(--border);
-            white-space: nowrap;
+        .btn-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .filter-btn {
+            background: var(--card-sub); color: var(--text-dim); border: 1px solid var(--border);
+            padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; transition: 0.2s;
         }
-        th {
-            background: var(--card-sub);
-            color: var(--text-dim);
-            font-weight: 600;
-            cursor: pointer;
-            user-select: none;
-            transition: 0.2s;
+        .filter-btn:hover { color: var(--text); border-color: var(--text-dim); }
+        .filter-btn.active { background: var(--accent); color: #0b0f19; font-weight: 600; border-color: var(--accent); }
+        
+        select.metric-select {
+            background: var(--card-sub); color: var(--text); border: 1px solid var(--border);
+            padding: 4px 10px; border-radius: 5px; font-size: 12px; outline: none;
         }
-        th:hover { color: var(--accent); }
-        th.sort-active { color: var(--accent); }
+
+        /* 图表容器 */
+        .chart-wrapper { position: relative; width: 100%; height: 320px; }
+
+        /* 表格样式 */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; min-width: 860px; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        th { background: var(--card-sub); color: var(--text-dim); font-weight: 600; cursor: pointer; user-select: none; }
+        th:hover, th.sort-active { color: var(--accent); }
         th.sort-desc::after { content: " ▼"; font-size: 10px; }
         th.sort-asc::after { content: " ▲"; font-size: 10px; }
+        tr.data-row { transition: background 0.35s ease-out; }
+        tr.data-row:hover td { background: rgba(255, 255, 255, 0.04); }
 
-        /* 核心：整行渐变进度条与高亮 */
-        tr.data-row {
-            transition: background 0.35s ease-out;
-        }
-        tr.data-row:hover td {
-            background: rgba(255, 255, 255, 0.04);
-        }
-
-        /* 列宽分配 */
         .col-rank { width: 50px; text-align: center; color: var(--text-dim); font-weight: bold; }
-        .col-tag { width: 100px; color: var(--accent); font-weight: 600; }
+        .col-tag { width: 105px; color: var(--accent); font-weight: 600; }
         .col-num { width: 95px; font-family: monospace; font-size: 13px; }
-        .col-num.active-metric {
-            color: #fff;
-            font-weight: 700;
-            text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
-        }
-        .col-title {
-            width: auto;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .title-link {
-            color: var(--text);
-            text-decoration: none;
-        }
-        .title-link:hover {
-            color: var(--accent);
-            text-decoration: underline;
-        }
+        .col-num.active-metric { color: #fff; font-weight: 700; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
+        .col-title { width: auto; overflow: hidden; text-overflow: ellipsis; }
+        .title-link { color: var(--text); text-decoration: none; }
+        .title-link:hover { color: var(--accent); text-decoration: underline; }
         .loading { text-align: center; padding: 40px; color: var(--text-dim); }
     </style>
-    <script type="text/javascript" src="//api.tongjiniao.com/c?_=949600360359993344" async></script>
 </head>
 <body>
     <div class="container">
+        <!-- 头部导航 -->
         <div class="header">
-            <h1>📊 Bilibili 编程语言教程排行榜</h1>
+            <h1>📈 Bilibili 编程语言教程热度档案馆</h1>
             <div class="header-actions">
                 <div class="update-time" id="updateTime">最后更新: 加载中...</div>
                 <a class="github-btn" href="https://github.com/cnlnr/Bilibili-Programming-Language-Rankings" target="_blank" rel="noopener noreferrer">
-                    <svg viewBox="0 0 16 16" aria-hidden="true">
-                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                    </svg>
+                    <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
                     GitHub
                 </a>
             </div>
         </div>
-        <div class="desc">💡 点击任意数值表头，整行将按比例自动展开背景发光对比条</div>
 
+        <!-- 历史趋势折线图区域 -->
+        <div class="section-box">
+            <div class="controls-bar">
+                <div class="btn-group" id="timeFilters">
+                    <span style="font-size: 13px; color: var(--text-dim); margin-right: 4px;">跨度:</span>
+                    <button class="filter-btn active" data-days="0">全部</button>
+                    <button class="filter-btn" data-days="7">7天</button>
+                    <button class="filter-btn" data-days="30">1个月</button>
+                    <button class="filter-btn" data-days="365">1年</button>
+                    <button class="filter-btn" data-days="1095">3年</button>
+                    <button class="filter-btn" data-days="1825">5年</button>
+                    <button class="filter-btn" data-days="3650">10年</button>
+                    <button class="filter-btn" data-days="7300">20年</button>
+                    <button class="filter-btn" data-days="10950">30年</button>
+                    <button class="filter-btn" data-days="18250">50年</button>
+                    <button class="filter-btn" data-days="36500">100年</button>
+                </div>
+                <div>
+                    <select class="metric-select" id="chartMetricSelect">
+                        <option value="view">按 播放量 趋势</option>
+                        <option value="favorite" selected>按 收藏数 趋势</option>
+                        <option value="like">按 点赞数 趋势</option>
+                        <option value="coin">按 硬币数 趋势</option>
+                        <option value="reply">按 评论数 趋势</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 实时详细数据排行榜 -->
         <div class="section-box">
             <div class="table-wrap">
                 <table id="rankTable">
@@ -167,9 +163,21 @@
     </div>
 
     <script>
-        let rawData = [];
-        let currentKey = "favorite";
+        let historySnapshots = []; // 全部历史快照列表
+        let currentTableData = [];  // 最新一期用于表格展示的数据
+        let currentSortKey = "favorite";
         let isAsc = false;
+        let chartInstance = null;
+        let selectedSpanDays = 0; // 0 表示全部
+
+        const METRIC_INDEX_MAP = {
+            favorite: 3, view: 4, like: 5, coin: 6, reply: 7, danmaku: 8
+        };
+
+        const COLOR_PALETTE = [
+            '#38bdf8', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6',
+            '#ec4899', '#06b6d4', '#84cc16', '#a855f7', '#64748b'
+        ];
 
         function fmt(n) {
             if (n >= 1e8) return (n / 1e8).toFixed(1) + '亿';
@@ -177,61 +185,140 @@
             return (n || 0).toLocaleString();
         }
 
-        function render() {
-            if (!rawData.length) return;
-            rawData.sort((a, b) => isAsc ? (a[currentKey] - b[currentKey]) : (b[currentKey] - a[currentKey]));
+        // 渲染表格
+        function renderTable() {
+            if (!currentTableData.length) return;
+            currentTableData.sort((a, b) => isAsc ? (a[currentSortKey] - b[currentSortKey]) : (b[currentSortKey] - a[currentSortKey]));
 
-            const maxVal = Math.max(...rawData.map(r => r[currentKey]), 1);
+            const maxVal = Math.max(...currentTableData.map(r => r[currentSortKey]), 1);
 
-            document.getElementById("tableBody").innerHTML = rawData.map((r, idx) => {
-                const pct = ((r[currentKey] / maxVal) * 100).toFixed(1);
-                // 使用 CSS 线性渐变直接给 tr 绘制进度条（带边缘微光线）
+            document.getElementById("tableBody").innerHTML = currentTableData.map((r, idx) => {
+                const pct = ((r[currentSortKey] / maxVal) * 100).toFixed(1);
                 const rowBg = `linear-gradient(to right, var(--bar-color) 0%, var(--bar-color) ${pct}%, var(--bar-line) ${pct}%, transparent calc(${pct}% + 1.5px), transparent 100%)`;
 
                 return `
                     <tr class="data-row" style="background: ${rowBg};">
                         <td class="col-rank">${idx + 1}</td>
                         <td class="col-tag">${r.tag}</td>
-                        <td class="col-num ${currentKey === 'favorite' ? 'active-metric' : ''}">${fmt(r.favorite)}</td>
-                        <td class="col-num ${currentKey === 'view' ? 'active-metric' : ''}">${fmt(r.view)}</td>
-                        <td class="col-num ${currentKey === 'like' ? 'active-metric' : ''}">${fmt(r.like)}</td>
-                        <td class="col-num ${currentKey === 'coin' ? 'active-metric' : ''}">${fmt(r.coin)}</td>
-                        <td class="col-num ${currentKey === 'reply' ? 'active-metric' : ''}">${fmt(r.reply)}</td>
-                        <td class="col-num ${currentKey === 'danmaku' ? 'active-metric' : ''}">${fmt(r.danmaku)}</td>
+                        <td class="col-num ${currentSortKey === 'favorite' ? 'active-metric' : ''}" title="${r.favorite.toLocaleString()}">${fmt(r.favorite)}</td>
+                        <td class="col-num ${currentSortKey === 'view' ? 'active-metric' : ''}" title="${r.view.toLocaleString()}">${fmt(r.view)}</td>
+                        <td class="col-num ${currentSortKey === 'like' ? 'active-metric' : ''}" title="${r.like.toLocaleString()}">${fmt(r.like)}</td>
+                        <td class="col-num ${currentSortKey === 'coin' ? 'active-metric' : ''}" title="${r.coin.toLocaleString()}">${fmt(r.coin)}</td>
+                        <td class="col-num ${currentSortKey === 'reply' ? 'active-metric' : ''}" title="${r.reply.toLocaleString()}">${fmt(r.reply)}</td>
+                        <td class="col-num ${currentSortKey === 'danmaku' ? 'active-metric' : ''}" title="${r.danmaku.toLocaleString()}">${fmt(r.danmaku)}</td>
                         <td class="col-title">
-                            <a class="title-link" href="${r.url}" target="_blank" title="${r.title}">${r.title}</a>
+                            <a class="title-link" href="https://www.bilibili.com/video/${r.bvid}" target="_blank" title="${r.title}">${r.title}</a>
                         </td>
                     </tr>
                 `;
             }).join("");
         }
 
-        // 绑定表头点击
+        // 初始化与更新折线图
+        function updateTrendChart() {
+            if (!historySnapshots.length) return;
+
+            const selectedMetric = document.getElementById("chartMetricSelect").value;
+            const metricIdx = METRIC_INDEX_MAP[selectedMetric];
+
+            // 1. 过滤时间范围
+            const now = new Date(historySnapshots[historySnapshots.length - 1].updated_at.replace(/-/g, "/")).getTime();
+            const filteredSnapshots = historySnapshots.filter(snap => {
+                if (selectedSpanDays === 0) return true;
+                const snapTime = new Date(snap.updated_at.replace(/-/g, "/")).getTime();
+                return (now - snapTime) <= (selectedSpanDays * 24 * 3600 * 1000);
+            });
+
+            const labels = filteredSnapshots.map(s => s.updated_at.split(" ")[0]);
+
+            // 2. 获取排名前 8 语言（保持图表清晰）
+            const topTags = currentTableData.slice(0, 8).map(d => d.tag);
+
+            const datasets = topTags.map((tag, i) => {
+                const color = COLOR_PALETTE[i % COLOR_PALETTE.length];
+                const dataPoints = filteredSnapshots.map(snap => {
+                    const row = (snap.rows || []).find(r => r[0] === tag);
+                    return row ? row[metricIdx] : null;
+                });
+
+                return {
+                    label: tag,
+                    data: dataPoints,
+                    borderColor: color,
+                    backgroundColor: color,
+                    borderWidth: 2,
+                    tension: 0.3,
+                    pointRadius: filteredSnapshots.length > 30 ? 0 : 3
+                };
+            });
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12 } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.dataset.label}: ${fmt(ctx.raw)} (${ctx.raw.toLocaleString()})`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(45, 58, 84, 0.4)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: 'rgba(45, 58, 84, 0.4)' }, ticks: { color: '#94a3b8', callback: (v) => fmt(v) } }
+                    }
+                }
+            });
+        }
+
+        // 事件监听绑定
         document.querySelectorAll("th[data-key]").forEach(th => {
             th.addEventListener("click", () => {
                 const key = th.getAttribute("data-key");
-                if (currentKey === key) {
-                    isAsc = !isAsc;
-                } else {
-                    currentKey = key;
-                    isAsc = false;
-                }
+                if (currentSortKey === key) isAsc = !isAsc;
+                else { currentSortKey = key; isAsc = false; }
                 document.querySelectorAll("th").forEach(h => h.classList.remove("sort-active", "sort-desc", "sort-asc"));
                 th.classList.add("sort-active", isAsc ? "sort-asc" : "sort-desc");
-                render();
+                renderTable();
             });
         });
 
-        // 异步读取紧凑 data.json
+        document.getElementById("timeFilters").addEventListener("click", (e) => {
+            if (e.target.tagName === "BUTTON") {
+                document.querySelectorAll("#timeFilters button").forEach(b => b.classList.remove("active"));
+                e.target.classList.add("active");
+                selectedSpanDays = parseInt(e.target.getAttribute("data-days"), 10);
+                updateTrendChart();
+            }
+        });
+
+        document.getElementById("chartMetricSelect").addEventListener("change", updateTrendChart);
+
+        // 加载并初始化数据
         fetch('./data.json')
             .then(res => res.json())
-            .then(res => {
-                document.getElementById('updateTime').innerText = `最后更新: ${res.updated_at || '未知'}`;
-                rawData = (res.rows || []).map(([tag, bvid, title, favorite, view, like, coin, reply, danmaku]) => ({
-                    tag, bvid, title, favorite, view, like, coin, reply, danmaku,
-                    url: `https://www.bilibili.com/video/${bvid}`
+            .then(data => {
+                // 兼容老单快照与新历史数组结构
+                historySnapshots = Array.isArray(data) ? data : [data];
+                const latestSnapshot = historySnapshots[historySnapshots.length - 1];
+
+                document.getElementById('updateTime').innerText = `最后更新: ${latestSnapshot.updated_at || '未知'}`;
+
+                currentTableData = (latestSnapshot.rows || []).map(([tag, bvid, title, favorite, view, like, coin, reply, danmaku]) => ({
+                    tag, bvid, title, favorite, view, like, coin, reply, danmaku
                 }));
-                render();
+
+                renderTable();
+                updateTrendChart();
             })
             .catch(err => {
                 document.getElementById("tableBody").innerHTML = `<tr><td colspan="9" class="loading" style="color:#ef4444">加载 data.json 失败: ${err}</td></tr>`;
