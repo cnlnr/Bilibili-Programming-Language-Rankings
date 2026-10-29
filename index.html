@@ -21,8 +21,7 @@
             --accent: #38bdf8;
             --bar-color: rgba(56, 189, 248, 0.16);
             --bar-line: rgba(56, 189, 248, 0.5);
-            --badge-warn: rgba(245, 158, 11, 0.2);
-            --badge-warn-text: #fbbf24;
+            --history-accent: #f59e0b;
         }
         * { box-sizing: border-box; }
         body {
@@ -89,18 +88,25 @@
         .col-tag { width: 110px; color: var(--accent); font-weight: 600; }
         .col-num { width: 95px; font-family: monospace; font-size: 13px; }
         .col-num.active-metric { color: #fff; font-weight: 700; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
-        .col-title { width: auto; overflow: hidden; text-overflow: ellipsis; }
-        .title-link { color: var(--text); text-decoration: none; }
+        .col-title { width: auto; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
+        .title-link { color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; }
         .title-link:hover { color: var(--accent); text-decoration: underline; }
-        .bv-pill {
-            font-size: 11px;
-            background: var(--card-sub);
-            border: 1px solid var(--border);
-            padding: 1px 5px;
+        
+        /* 优雅的换绑历史提示符 */
+        .history-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--history-accent);
+            border: 1px solid rgba(245, 158, 11, 0.4);
             border-radius: 4px;
-            color: var(--text-dim);
-            margin-right: 6px;
+            font-size: 11px;
+            padding: 1px 5px;
+            cursor: help;
+            flex-shrink: 0;
         }
+
         .loading { text-align: center; padding: 40px; color: var(--text-dim); }
     </style>
     <script type="text/javascript" src="//api.tongjiniao.com/c?_=802202363016777728" async></script>
@@ -169,7 +175,7 @@
                             <th class="col-num" data-key="coin">硬币数</th>
                             <th class="col-num" data-key="reply">评论数</th>
                             <th class="col-num" data-key="danmaku">弹幕数</th>
-                            <th class="col-title">当前对应视频</th>
+                            <th style="width: auto;">视频标题</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -189,6 +195,9 @@
         let selectedSpanDays = 0;
         let viewMode = "delta";
 
+        // 全局历史映射: tag -> Array of { bvid, title, firstSeen, lastSeen }
+        let tagHistoryMap = {};
+
         const METRIC_INDEX_MAP = {
             favorite: 3, view: 4, like: 5, coin: 6, reply: 7, danmaku: 8
         };
@@ -207,6 +216,32 @@
             return Number(n).toLocaleString();
         }
 
+        // 构建标签的视频版本更迭图谱
+        function buildTagHistory(snapshots) {
+            tagHistoryMap = {};
+            snapshots.forEach(snap => {
+                const date = snap.updated_at;
+                (snap.rows || []).forEach(row => {
+                    const tag = row[0];
+                    const bvid = row[1];
+                    const title = row[2] || '';
+                    if (!tagHistoryMap[tag]) tagHistoryMap[tag] = [];
+                    
+                    const existing = tagHistoryMap[tag].find(item => item.bvid === bvid);
+                    if (existing) {
+                        existing.lastSeen = date;
+                    } else {
+                        tagHistoryMap[tag].push({
+                            bvid: bvid,
+                            title: title,
+                            firstSeen: date,
+                            lastSeen: date
+                        });
+                    }
+                });
+            });
+        }
+
         function renderTable() {
             if (!currentTableData.length) return;
             currentTableData.sort((a, b) => isAsc ? (a[currentSortKey] - b[currentSortKey]) : (b[currentSortKey] - a[currentSortKey]));
@@ -216,6 +251,15 @@
             document.getElementById("tableBody").innerHTML = currentTableData.map((r, idx) => {
                 const pct = ((r[currentSortKey] / maxVal) * 100).toFixed(1);
                 const rowBg = `linear-gradient(to right, var(--bar-color) 0%, var(--bar-color) ${pct}%, var(--bar-line) ${pct}%, transparent calc(${pct}% + 1.5px), transparent 100%)`;
+
+                // 判断该语言是否有过换绑历史
+                const historyList = tagHistoryMap[r.tag] || [];
+                const hasSwitch = historyList.length > 1;
+                let switchBadge = '';
+                if (hasSwitch) {
+                    const historyTips = historyList.map((h, i) => `第${i+1}任: [${h.bvid}] ${h.title} (${h.firstSeen} ~ ${h.lastSeen})`).join('&#10;');
+                    switchBadge = `<span class="history-tag" title="该语言曾更换过标的视频:&#10;${historyTips}">换过链接 (${historyList.length})</span>`;
+                }
 
                 return `
                     <tr class="data-row" style="background: ${rowBg};">
@@ -227,9 +271,11 @@
                         <td class="col-num ${currentSortKey === 'coin' ? 'active-metric' : ''}" title="精准数值: ${r.coin.toLocaleString()}">${fmt(r.coin)}</td>
                         <td class="col-num ${currentSortKey === 'reply' ? 'active-metric' : ''}" title="精准数值: ${r.reply.toLocaleString()}">${fmt(r.reply)}</td>
                         <td class="col-num ${currentSortKey === 'danmaku' ? 'active-metric' : ''}" title="精准数值: ${r.danmaku.toLocaleString()}">${fmt(r.danmaku)}</td>
-                        <td class="col-title">
-                            <span class="bv-pill">${r.bvid}</span>
-                            <a class="title-link" href="https://www.bilibili.com/video/${r.bvid}" target="_blank" title="${r.title}">${r.title}</a>
+                        <td>
+                            <div class="col-title">
+                                ${switchBadge}
+                                <a class="title-link" href="https://www.bilibili.com/video/${r.bvid}" target="_blank" title="${r.title}">${r.title}</a>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -257,7 +303,7 @@
                 return snapTime >= xMin && snapTime <= xMax;
             });
 
-            // 严格锁定：按当前最新快照的收藏量前 20 大盘语言展示
+            // 锁定当前最受关注的前 20 语言
             const top20ByFavorite = [...currentTableData]
                 .sort((a, b) => b.favorite - a.favorite)
                 .slice(0, 20)
@@ -265,9 +311,10 @@
 
             const series = top20ByFavorite.map((tag) => {
                 const points = [];
-                let cumulativeDelta = 0;
+                let stepAccDelta = 0;
                 let prevVal = null;
                 let prevBvid = null;
+                const markPoints = [];
 
                 filteredSnapshots.forEach((snap, snapIdx) => {
                     const row = (snap.rows || []).find(r => r[0] === tag);
@@ -278,34 +325,31 @@
                     const curTitle = row[2] || "未知";
                     const curVal = row[metricIdx];
 
+                    const isSwitchNode = prevBvid !== null && curBvid !== prevBvid;
+
                     if (viewMode === "delta") {
                         if (snapIdx === 0 || prevVal === null) {
-                            cumulativeDelta = 0;
-                        } else {
-                            // 严谨检测换绑：如果前后两次快照的 BV 号不一致，说明目标视频已更换
-                            // 此时不应将新老视频绝对值做减法（会导致断崖下跌或暴涨），而是跳过突变量，保持增量曲线连续平滑
-                            if (prevBvid && curBvid !== prevBvid) {
-                                // 换绑瞬间：该间隔记 0 净增，并记录切换状态
-                            } else {
-                                const stepDelta = curVal - prevVal;
-                                cumulativeDelta += stepDelta;
-                            }
+                            stepAccDelta = 0;
+                        } else if (!isSwitchNode) {
+                            stepAccDelta += (curVal - prevVal);
                         }
-                        points.push({
-                            value: [time, cumulativeDelta],
-                            bvid: curBvid,
-                            rawVal: curVal,
-                            title: curTitle,
-                            isSwitched: prevBvid && curBvid !== prevBvid
-                        });
+                        
+                        points.push([time, stepAccDelta]);
                     } else {
-                        // 总量模式：展示当前对应视频的实际总量
-                        points.push({
-                            value: [time, curVal],
-                            bvid: curBvid,
-                            rawVal: curVal,
-                            title: curTitle,
-                            isSwitched: prevBvid && curBvid !== prevBvid
+                        // 总量模式：若切换视频，插入断点避免画出极其丑陋的垂直骤跌/暴涨连线
+                        if (isSwitchNode) {
+                            points.push([time - 1, null]); // 自然断开曲线
+                        }
+                        points.push([time, curVal]);
+                    }
+
+                    // 换绑事件标记
+                    if (isSwitchNode) {
+                        markPoints.push({
+                            name: '换绑',
+                            coord: [time, viewMode === "delta" ? stepAccDelta : curVal],
+                            value: '换',
+                            itemStyle: { color: '#f59e0b' }
                         });
                     }
 
@@ -317,10 +361,16 @@
                     name: tag,
                     type: 'line',
                     data: points,
+                    connectNulls: false, // 严格不强行连接 null 断点
                     smooth: false,
                     symbol: 'circle',
-                    symbolSize: 6,
-                    lineStyle: { width: 2.2 }
+                    symbolSize: 5,
+                    lineStyle: { width: 2.2 },
+                    markPoint: markPoints.length ? {
+                        symbol: 'pin',
+                        symbolSize: 28,
+                        data: markPoints
+                    } : undefined
                 };
             });
 
@@ -344,17 +394,15 @@
                         let html = `<div style="font-weight:600;margin-bottom:6px;border-bottom:1px solid #2d3a54;padding-bottom:4px;">${dateStr}</div>`;
                         
                         params.forEach(item => {
+                            if (item.value[1] === null) return;
                             const val = item.value[1];
-                            const rawData = item.data;
                             const formattedVal = viewMode === "delta"
                                 ? (val >= 0 ? `+${val.toLocaleString()}` : `${val.toLocaleString()}`)
                                 : `${fmt(val)} (${val.toLocaleString()})`;
-                            
-                            const switchBadge = rawData.isSwitched ? ` <span style="color:#fbbf24;font-size:10px;">[更换链接]</span>` : '';
 
                             html += `
                                 <div style="display:flex;justify-content:space-between;gap:16px;margin:3px 0;">
-                                    <span>${item.marker} ${item.seriesName}${switchBadge}</span>
+                                    <span>${item.marker} ${item.seriesName}</span>
                                     <span style="font-weight:bold;font-family:monospace;">${formattedVal}</span>
                                 </div>
                             `;
@@ -437,6 +485,9 @@
                 const latestSnapshot = historySnapshots[historySnapshots.length - 1];
 
                 document.getElementById('updateTime').innerText = `最后更新: ${latestSnapshot.updated_at || '未知'}`;
+
+                // 核心：全量构建每个 Tag 的换绑历史
+                buildTagHistory(historySnapshots);
 
                 currentTableData = (latestSnapshot.rows || []).map(([tag, bvid, title, favorite, view, like, coin, reply, danmaku]) => ({
                     tag, bvid, title, favorite, view, like, coin, reply, danmaku
