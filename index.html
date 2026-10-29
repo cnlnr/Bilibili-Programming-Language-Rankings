@@ -21,6 +21,8 @@
             --accent: #38bdf8;
             --bar-color: rgba(56, 189, 248, 0.16);
             --bar-line: rgba(56, 189, 248, 0.5);
+            --badge-warn: rgba(245, 158, 11, 0.2);
+            --badge-warn-text: #fbbf24;
         }
         * { box-sizing: border-box; }
         body {
@@ -84,12 +86,21 @@
         tr.data-row:hover td { background: rgba(255, 255, 255, 0.04); }
 
         .col-rank { width: 50px; text-align: center; color: var(--text-dim); font-weight: bold; }
-        .col-tag { width: 105px; color: var(--accent); font-weight: 600; }
+        .col-tag { width: 110px; color: var(--accent); font-weight: 600; }
         .col-num { width: 95px; font-family: monospace; font-size: 13px; }
         .col-num.active-metric { color: #fff; font-weight: 700; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
         .col-title { width: auto; overflow: hidden; text-overflow: ellipsis; }
         .title-link { color: var(--text); text-decoration: none; }
         .title-link:hover { color: var(--accent); text-decoration: underline; }
+        .bv-pill {
+            font-size: 11px;
+            background: var(--card-sub);
+            border: 1px solid var(--border);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: var(--text-dim);
+            margin-right: 6px;
+        }
         .loading { text-align: center; padding: 40px; color: var(--text-dim); }
     </style>
     <script type="text/javascript" src="//api.tongjiniao.com/c?_=802202363016777728" async></script>
@@ -137,6 +148,7 @@
                         <option value="like">点赞数</option>
                         <option value="coin">硬币数</option>
                         <option value="reply">评论数</option>
+                        <option value="danmaku">弹幕数</option>
                     </select>
                 </div>
             </div>
@@ -157,7 +169,7 @@
                             <th class="col-num" data-key="coin">硬币数</th>
                             <th class="col-num" data-key="reply">评论数</th>
                             <th class="col-num" data-key="danmaku">弹幕数</th>
-                            <th class="col-title">视频标题</th>
+                            <th class="col-title">当前对应视频</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -189,9 +201,10 @@
         ];
 
         function fmt(n) {
+            if (n === null || n === undefined || isNaN(n)) return '0';
             if (Math.abs(n) >= 1e8) return (n / 1e8).toFixed(1) + '亿';
             if (Math.abs(n) >= 1e4) return (n / 1e4).toFixed(1) + '万';
-            return (n || 0).toLocaleString();
+            return Number(n).toLocaleString();
         }
 
         function renderTable() {
@@ -215,6 +228,7 @@
                         <td class="col-num ${currentSortKey === 'reply' ? 'active-metric' : ''}" title="精准数值: ${r.reply.toLocaleString()}">${fmt(r.reply)}</td>
                         <td class="col-num ${currentSortKey === 'danmaku' ? 'active-metric' : ''}" title="精准数值: ${r.danmaku.toLocaleString()}">${fmt(r.danmaku)}</td>
                         <td class="col-title">
+                            <span class="bv-pill">${r.bvid}</span>
                             <a class="title-link" href="https://www.bilibili.com/video/${r.bvid}" target="_blank" title="${r.title}">${r.title}</a>
                         </td>
                     </tr>
@@ -228,7 +242,8 @@
             const selectedMetric = document.getElementById("chartMetricSelect").value;
             const metricIdx = METRIC_INDEX_MAP[selectedMetric];
 
-            const lastSnapTime = new Date(historySnapshots[historySnapshots.length - 1].updated_at.replace(/-/g, "/")).getTime();
+            const lastSnap = historySnapshots[historySnapshots.length - 1];
+            const lastSnapTime = new Date(lastSnap.updated_at.replace(/-/g, "/")).getTime();
 
             let xMin = null, xMax = null;
             if (selectedSpanDays > 0) {
@@ -242,28 +257,60 @@
                 return snapTime >= xMin && snapTime <= xMax;
             });
 
-            // 严格锁定：按【收藏量最高的前 20 门大盘语言】作为展示对象
+            // 严格锁定：按当前最新快照的收藏量前 20 大盘语言展示
             const top20ByFavorite = [...currentTableData]
                 .sort((a, b) => b.favorite - a.favorite)
                 .slice(0, 20)
                 .map(d => d.tag);
 
-            const series = top20ByFavorite.map((tag, i) => {
-                let baseVal = null;
+            const series = top20ByFavorite.map((tag) => {
                 const points = [];
+                let cumulativeDelta = 0;
+                let prevVal = null;
+                let prevBvid = null;
 
-                filteredSnapshots.forEach(snap => {
+                filteredSnapshots.forEach((snap, snapIdx) => {
                     const row = (snap.rows || []).find(r => r[0] === tag);
-                    if (row) {
-                        const time = new Date(snap.updated_at.replace(/-/g, "/")).getTime();
-                        const val = row[metricIdx];
-                        if (viewMode === "delta") {
-                            if (baseVal === null) baseVal = val;
-                            points.push([time, val - baseVal]);
+                    if (!row) return;
+
+                    const time = new Date(snap.updated_at.replace(/-/g, "/")).getTime();
+                    const curBvid = row[1];
+                    const curTitle = row[2] || "未知";
+                    const curVal = row[metricIdx];
+
+                    if (viewMode === "delta") {
+                        if (snapIdx === 0 || prevVal === null) {
+                            cumulativeDelta = 0;
                         } else {
-                            points.push([time, val]);
+                            // 严谨检测换绑：如果前后两次快照的 BV 号不一致，说明目标视频已更换
+                            // 此时不应将新老视频绝对值做减法（会导致断崖下跌或暴涨），而是跳过突变量，保持增量曲线连续平滑
+                            if (prevBvid && curBvid !== prevBvid) {
+                                // 换绑瞬间：该间隔记 0 净增，并记录切换状态
+                            } else {
+                                const stepDelta = curVal - prevVal;
+                                cumulativeDelta += stepDelta;
+                            }
                         }
+                        points.push({
+                            value: [time, cumulativeDelta],
+                            bvid: curBvid,
+                            rawVal: curVal,
+                            title: curTitle,
+                            isSwitched: prevBvid && curBvid !== prevBvid
+                        });
+                    } else {
+                        // 总量模式：展示当前对应视频的实际总量
+                        points.push({
+                            value: [time, curVal],
+                            bvid: curBvid,
+                            rawVal: curVal,
+                            title: curTitle,
+                            isSwitched: prevBvid && curBvid !== prevBvid
+                        });
                     }
+
+                    prevVal = curVal;
+                    prevBvid = curBvid;
                 });
 
                 return {
@@ -287,16 +334,32 @@
                 color: COLOR_PALETTE,
                 tooltip: {
                     trigger: 'axis',
-                    order: 'valueDesc', // 按当前悬浮点的数值从高到低排序
-                    backgroundColor: 'rgba(21, 29, 48, 0.95)',
+                    order: 'valueDesc',
+                    backgroundColor: 'rgba(21, 29, 48, 0.96)',
                     borderColor: '#2d3a54',
                     textStyle: { color: '#f1f5f9', fontSize: 12 },
-                    valueFormatter: (val) => {
-                        if (val === null || val === undefined) return '-';
-                        if (viewMode === "delta") {
-                            return val >= 0 ? `+${val.toLocaleString()}` : `${val.toLocaleString()}`;
-                        }
-                        return `${fmt(val)} (${val.toLocaleString()})`;
+                    formatter: (params) => {
+                        if (!params || !params.length) return '';
+                        const dateStr = params[0].axisValueLabel;
+                        let html = `<div style="font-weight:600;margin-bottom:6px;border-bottom:1px solid #2d3a54;padding-bottom:4px;">${dateStr}</div>`;
+                        
+                        params.forEach(item => {
+                            const val = item.value[1];
+                            const rawData = item.data;
+                            const formattedVal = viewMode === "delta"
+                                ? (val >= 0 ? `+${val.toLocaleString()}` : `${val.toLocaleString()}`)
+                                : `${fmt(val)} (${val.toLocaleString()})`;
+                            
+                            const switchBadge = rawData.isSwitched ? ` <span style="color:#fbbf24;font-size:10px;">[更换链接]</span>` : '';
+
+                            html += `
+                                <div style="display:flex;justify-content:space-between;gap:16px;margin:3px 0;">
+                                    <span>${item.marker} ${item.seriesName}${switchBadge}</span>
+                                    <span style="font-weight:bold;font-family:monospace;">${formattedVal}</span>
+                                </div>
+                            `;
+                        });
+                        return html;
                     }
                 },
                 legend: {
