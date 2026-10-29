@@ -26,7 +26,7 @@ urls = {
     "Java": "https://www.bilibili.com/video/BV17F411T7Ao/",
     "C++": "https://www.bilibili.com/video/BV1et411b73Z/",
     "Rust": "https://www.bilibili.com/video/BV1hp4y1k7SV/",
-    "C": "https://www.bilibili.com/video/BV1q54y1q79w/",
+    "C": "https://www.bilibili.com/video/BV1dr4y1n7vA/",
     "JavaScript": "https://www.bilibili.com/video/BV1Y84y1L7Nn/",
     "Ruby": "https://www.bilibili.com/video/BV1QW411F7rh/",
     "Bash": "https://www.bilibili.com/video/BV1ah411R7W6/",
