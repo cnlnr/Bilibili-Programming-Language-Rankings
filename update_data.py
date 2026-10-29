@@ -64,8 +64,13 @@ def fetch_bilibili_data(bvid: str) -> dict:
     """调用 B 站公开 Web API 获取视频详情"""
     api_url = f"https://api.bilibili.com/x/web-interface/view?bvid={bvid}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://www.bilibili.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": f"https://www.bilibili.com/video/{bvid}",
+        "Origin": "https://www.bilibili.com",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        # 传入基础访客标识，降低无 Cookie 触发 -412 风控的概率
+        "Cookie": "buvid3=infoc; b_nut=1700000000;",
     }
     req = urllib.request.Request(api_url, headers=headers)
     with urllib.request.urlopen(req, timeout=10) as resp:
