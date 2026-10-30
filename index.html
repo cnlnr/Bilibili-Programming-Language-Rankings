@@ -338,7 +338,7 @@
                     } else {
                         // 总量模式：若切换视频，插入断点避免画出极其丑陋的垂直骤跌/暴涨连线
                         if (isSwitchNode) {
-                            points.push([time - 1, null]); // 自然断开曲线
+                            points.push([time - 1, null]);
                         }
                         points.push([time, curVal]);
                     }
@@ -361,7 +361,7 @@
                     name: tag,
                     type: 'line',
                     data: points,
-                    connectNulls: false, // 严格不强行连接 null 断点
+                    connectNulls: false,
                     smooth: false,
                     symbol: 'circle',
                     symbolSize: 5,
@@ -384,7 +384,6 @@
                 color: COLOR_PALETTE,
                 tooltip: {
                     trigger: 'axis',
-                    order: 'valueDesc',
                     backgroundColor: 'rgba(21, 29, 48, 0.96)',
                     borderColor: '#2d3a54',
                     textStyle: { color: '#f1f5f9', fontSize: 12 },
@@ -393,8 +392,12 @@
                         const dateStr = params[0].axisValueLabel;
                         let html = `<div style="font-weight:600;margin-bottom:6px;border-bottom:1px solid #2d3a54;padding-bottom:4px;">${dateStr}</div>`;
                         
-                        params.forEach(item => {
-                            if (item.value[1] === null) return;
+                        // 从多到少降序排列（过滤掉 null 断点）
+                        const sortedParams = [...params]
+                            .filter(item => item.value && item.value[1] !== null && item.value[1] !== undefined)
+                            .sort((a, b) => b.value[1] - a.value[1]);
+
+                        sortedParams.forEach(item => {
                             const val = item.value[1];
                             const formattedVal = viewMode === "delta"
                                 ? (val >= 0 ? `+${val.toLocaleString()}` : `${val.toLocaleString()}`)
@@ -486,7 +489,7 @@
 
                 document.getElementById('updateTime').innerText = `最后更新: ${latestSnapshot.updated_at || '未知'}`;
 
-                // 核心：全量构建每个 Tag 的换绑历史
+                // 全量构建每个 Tag 的换绑历史
                 buildTagHistory(historySnapshots);
 
                 currentTableData = (latestSnapshot.rows || []).map(([tag, bvid, title, favorite, view, like, coin, reply, danmaku]) => ({
