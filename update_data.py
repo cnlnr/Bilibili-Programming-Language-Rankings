@@ -31,7 +31,7 @@ urls = {
     "Ruby": "https://www.bilibili.com/video/BV1QW411F7rh/",
     "Bash": "https://www.bilibili.com/video/BV1ah411R7W6/",
     "汇编": "https://www.bilibili.com/video/BV1Wu411B72F/",
-    "Nim": "https://www.bilibili.com/video/BV1zp4y137zi/",
+    "Nim": "https://www.bilibili.com/video/BV1z4cxz9EN6/",
     "R": "https://www.bilibili.com/video/BV1fh411H7vi/",
     "Perl": "https://www.bilibili.com/video/BV1px411e7gc/",
     "Dart": "https://www.bilibili.com/video/BV1S4411E7LY/",
